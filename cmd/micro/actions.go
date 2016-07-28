@@ -651,11 +651,9 @@ func (v *View) ClearStatus() bool {
 
 // ToggleHelp toggles the help screen
 func (v *View) ToggleHelp() bool {
-	if !CurView().Help {
-		helpBuffer := NewBuffer([]byte(helpTxt), "help.md")
-		helpBuffer.Name = "Help"
-		v.HSplit(helpBuffer)
-		CurView().Help = true
+	if !v.Help {
+		// Open the default help
+		v.openHelp("help")
 	} else {
 		v.Quit()
 	}
