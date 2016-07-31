@@ -689,9 +689,24 @@ func (v *View) Quit() bool {
 	// Make sure not to quit if there are unsaved changes
 	if v.CanClose("Quit anyway? (yes, no, save) ") {
 		v.CloseBuffer()
-		if len(tabs[curTab].views) > 1 {
-			screen.Fini()
-			os.Exit(0)
+		if len(tabs[v.TabNum].views) > 1 {
+			copy(tabs[v.TabNum].views[v.Num:], tabs[v.TabNum].views[v.Num+1:])
+			tabs[v.TabNum].views[len(tabs[v.TabNum].views)-1] = nil // or the zero value of T
+			tabs[v.TabNum].views = tabs[v.TabNum].views[:len(tabs[v.TabNum].views)-1]
+			for i, v := range tabs[v.TabNum].views {
+				v.Num = i
+			}
+			if tabs[curTab].curView != 0 {
+				tabs[v.TabNum].curView--
+			}
+
+			if v.splitParent != nil {
+				v.splitParent.RemoveFromSplits(v)
+			} else {
+				tabs[v.TabNum].RemoveFromSplits(v)
+			}
+
+			tabs[v.TabNum].Resize()
 		} else if len(tabs) > 1 {
 			if len(tabs[v.TabNum].views) == 1 {
 				tabs = tabs[:v.TabNum+copy(tabs[v.TabNum:], tabs[v.TabNum+1:])]

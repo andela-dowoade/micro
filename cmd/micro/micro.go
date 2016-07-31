@@ -58,6 +58,8 @@ var (
 	jobs chan JobFunction
 	// Event channel
 	events chan tcell.Event
+
+	viewIds int
 )
 
 // LoadInput determines which files should be loaded into buffers

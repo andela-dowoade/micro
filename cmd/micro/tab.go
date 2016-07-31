@@ -42,10 +42,23 @@ func (t *Tab) Resize() {
 		split.width = width
 		split.y = 0
 		split.x = width * i
+
+		split.matches = Match(split)
 	}
 
 	for _, v := range t.views {
 		v.ResizeSplits()
+	}
+}
+
+func (t *Tab) RemoveFromSplits(v *View) {
+	for i, split := range t.vertSplits {
+		if split.id == v.id {
+			copy(t.vertSplits[i:], t.vertSplits[i+1:])
+			t.vertSplits[len(t.vertSplits)-1] = nil // or the zero value of T
+			t.vertSplits = t.vertSplits[:len(t.vertSplits)-1]
+			return
+		}
 	}
 }
 

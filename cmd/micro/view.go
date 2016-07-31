@@ -85,6 +85,8 @@ type View struct {
 
 	origWidth  int
 	origHeight int
+
+	id int
 }
 
 // NewView returns a new fullscreen view
@@ -117,6 +119,9 @@ func NewViewWidthHeight(buf *Buffer, w, h int) *View {
 		v.height--
 	}
 
+	v.id = viewIds
+	viewIds++
+
 	return v
 }
 
@@ -141,6 +146,8 @@ func (v *View) ResizeSplits() {
 
 			split.x = v.x
 			split.y = v.height*(i+1) + 1
+
+			split.matches = Match(split)
 		}
 	} else {
 		v.width = v.origWidth / (len(v.splits) + 1)
@@ -150,6 +157,20 @@ func (v *View) ResizeSplits() {
 
 			split.y = v.y
 			split.x = v.width * (i + 1)
+
+			split.matches = Match(split)
+		}
+	}
+	v.matches = Match(v)
+}
+
+func (v *View) RemoveFromSplits(view *View) {
+	for i, split := range v.splits {
+		if split.id == view.id {
+			copy(v.splits[i:], v.splits[i+1:])
+			v.splits[len(v.splits)-1] = nil // or the zero value of T
+			v.splits = v.splits[:len(v.splits)-1]
+			return
 		}
 	}
 }
@@ -269,7 +290,6 @@ func (v *View) HSplit(buf *Buffer) bool {
 	}
 
 	tabs[v.TabNum].Resize()
-	newView.matches = Match(newView)
 
 	return false
 }
@@ -310,7 +330,6 @@ func (v *View) VSplit(buf *Buffer) bool {
 	}
 
 	tabs[v.TabNum].Resize()
-	newView.matches = Match(newView)
 
 	return false
 }
