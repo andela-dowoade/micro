@@ -112,7 +112,7 @@ func HSplit(args []string) {
 	}
 }
 
-// Tab opens the given file in a new tab
+// NewTab opens the given file in a new tab
 func NewTab(args []string) {
 	if len(args) == 0 {
 		CurView().AddTab()
@@ -126,13 +126,13 @@ func NewTab(args []string) {
 		tab.SetNum(len(tabs))
 		tabs = append(tabs, tab)
 		curTab++
-		if len(tabs) == 2 {
-			for _, t := range tabs {
-				for _, v := range t.views {
-					v.Resize(screen.Size())
-				}
-			}
-		}
+		// if len(tabs) == 2 {
+		// 	for _, t := range tabs {
+		// 		for _, v := range t.views {
+		// 			v.Resize(screen.Size())
+		// 		}
+		// 	}
+		// }
 	}
 }
 

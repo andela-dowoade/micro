@@ -690,6 +690,8 @@ func (v *View) Quit() bool {
 	if v.CanClose("Quit anyway? (yes, no, save) ") {
 		v.CloseBuffer()
 		if len(tabs[curTab].views) > 1 {
+			screen.Fini()
+			os.Exit(0)
 		} else if len(tabs) > 1 {
 			if len(tabs[v.TabNum].views) == 1 {
 				tabs = tabs[:v.TabNum+copy(tabs[v.TabNum:], tabs[v.TabNum+1:])]
@@ -700,7 +702,6 @@ func (v *View) Quit() bool {
 					curTab--
 				}
 				if curTab == 0 {
-					CurView().Resize(screen.Size())
 					CurView().matches = Match(CurView())
 				}
 			}
@@ -718,13 +719,13 @@ func (v *View) AddTab() bool {
 	tab.SetNum(len(tabs))
 	tabs = append(tabs, tab)
 	curTab++
-	if len(tabs) == 2 {
-		for _, t := range tabs {
-			for _, v := range t.views {
-				v.Resize(screen.Size())
-			}
-		}
-	}
+	// if len(tabs) == 2 {
+	// 	for _, t := range tabs {
+	// 		for _, v := range t.views {
+	// 			v.Resize(screen.Size())
+	// 		}
+	// 	}
+	// }
 	return true
 }
 

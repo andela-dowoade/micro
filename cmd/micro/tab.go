@@ -10,7 +10,8 @@ type Tab struct {
 	// This contains all the views in this tab
 	// There is generally only one view per tab, but you can have
 	// multiple views with splits
-	views []*View
+	views      []*View
+	vertSplits []*View
 	// This is the current view for this tab
 	curView int
 	// Generally this is the name of the current view's buffer
@@ -21,6 +22,7 @@ type Tab struct {
 func NewTabFromView(v *View) *Tab {
 	t := new(Tab)
 	t.views = append(t.views, v)
+	t.vertSplits = append(t.vertSplits, v)
 	t.views[0].Num = 0
 	return t
 }
@@ -29,6 +31,21 @@ func NewTabFromView(v *View) *Tab {
 func (t *Tab) SetNum(num int) {
 	for _, v := range t.views {
 		v.TabNum = num
+	}
+}
+
+func (t *Tab) Resize() {
+	w, h := screen.Size()
+	width := w / len(t.vertSplits)
+	for i, split := range t.vertSplits {
+		split.height = h - 2
+		split.width = width
+		split.y = 0
+		split.x = width * i
+	}
+
+	for _, v := range t.views {
+		v.ResizeSplits()
 	}
 }
 

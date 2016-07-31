@@ -24,10 +24,6 @@ type View struct {
 	// The leftmost column, used for horizontal scrolling
 	leftCol int
 
-	// Percentage of the terminal window that this view takes up (from 0 to 100)
-	widthPercent  int
-	heightPercent int
-
 	// Specifies whether or not this view holds a help buffer
 	Help bool
 
@@ -82,23 +78,32 @@ type View struct {
 	matches SyntaxMatches
 	// The matches from the last frame
 	lastMatches SyntaxMatches
+
+	isVertSplit bool
+	splits      []*View
+	splitParent *View
+
+	origWidth  int
+	origHeight int
 }
 
 // NewView returns a new fullscreen view
 func NewView(buf *Buffer) *View {
-	return NewViewWidthHeight(buf, 100, 100)
+	screenW, screenH := screen.Size()
+	return NewViewWidthHeight(buf, screenW, screenH-1)
 }
 
 // NewViewWidthHeight returns a new view with the specified width and height percentages
 // Note that w and h are percentages not actual values
 func NewViewWidthHeight(buf *Buffer, w, h int) *View {
 	v := new(View)
+	v.isVertSplit = true
 
 	v.x, v.y = 0, 0
 
-	v.widthPercent = w
-	v.heightPercent = h
-	v.Resize(screen.Size())
+	v.SetSize(w, h)
+	v.origWidth = w
+	v.origHeight = h
 
 	v.OpenBuffer(buf)
 
@@ -108,6 +113,10 @@ func NewViewWidthHeight(buf *Buffer, w, h int) *View {
 		view: v,
 	}
 
+	if settings["statusline"].(bool) {
+		v.height--
+	}
+
 	return v
 }
 
@@ -115,26 +124,33 @@ func NewViewWidthHeight(buf *Buffer, w, h int) *View {
 // percentages
 // This is usually called when the window is resized, or when a split has been added and
 // the percentages have changed
-func (v *View) Resize(w, h int) {
-	// Always include 1 line for the command line at the bottom
-	h--
-	if len(tabs) > 1 {
-		if v.y == 0 {
-			// Include one line for the tab bar at the top
-			h--
-			v.y = 1
+func (v *View) SetSize(w, h int) {
+	v.width = w
+	v.height = h
+}
+
+func (v *View) ResizeSplits() {
+	if len(v.splits) == 0 {
+		return
+	}
+	if v.isVertSplit {
+		v.height = v.origHeight / (len(v.splits) + 1)
+		for i, split := range v.splits {
+			split.width = v.width
+			split.height = v.height - 2
+
+			split.x = v.x
+			split.y = v.height*(i+1) + 1
 		}
 	} else {
-		if v.y == 1 {
-			v.y = 0
+		v.width = v.origWidth / (len(v.splits) + 1)
+		for i, split := range v.splits {
+			split.height = v.height - 1
+			split.width = v.width
+
+			split.y = v.y
+			split.x = v.width * (i + 1)
 		}
-	}
-	v.width = int(float32(w) * float32(v.widthPercent) / 100)
-	// We subtract 1 for the statusline
-	v.height = int(float32(h) * float32(v.heightPercent) / 100)
-	if settings["statusline"].(bool) {
-		// Make room for the status line if it is enabled
-		v.height--
 	}
 }
 
@@ -219,11 +235,83 @@ func (v *View) ReOpen() {
 
 // HSplit opens a horizontal split with the given buffer
 func (v *View) HSplit(buf *Buffer) bool {
+	var newView *View
+	if v.isVertSplit {
+		newView = NewView(buf)
+		newView.TabNum = v.TabNum
+
+		tab := tabs[v.TabNum]
+		tab.curView++
+
+		v.splits = append(v.splits, newView)
+		tab.views = append(tab.views, newView)
+
+		newView.splitParent = v
+		newView.Num = len(tab.views) - 1
+		newView.isVertSplit = false
+	} else {
+		newView = NewView(buf)
+		newView.TabNum = v.TabNum
+
+		tab := tabs[v.TabNum]
+		tab.curView++
+
+		if v.splitParent != nil {
+			v.splitParent.splits = append(v.splitParent.splits, newView)
+		} else {
+			return false
+		}
+		tab.views = append(tab.views, newView)
+
+		newView.splitParent = v.splitParent
+		newView.Num = len(tab.views) - 1
+		newView.isVertSplit = false
+	}
+
+	tabs[v.TabNum].Resize()
+	newView.matches = Match(newView)
+
 	return false
 }
 
 // VSplit opens a vertical split with the given buffer
 func (v *View) VSplit(buf *Buffer) bool {
+	var newView *View
+	if !v.isVertSplit {
+		newView = NewView(buf)
+		newView.TabNum = v.TabNum
+
+		tab := tabs[v.TabNum]
+		tab.curView++
+
+		v.splits = append(v.splits, newView)
+		tab.views = append(tab.views, newView)
+
+		newView.splitParent = v
+		newView.Num = len(tab.views) - 1
+		newView.isVertSplit = true
+	} else {
+		newView = NewView(buf)
+		newView.TabNum = v.TabNum
+
+		tab := tabs[v.TabNum]
+		tab.curView++
+
+		if v.splitParent != nil {
+			v.splitParent.splits = append(v.splitParent.splits, newView)
+		} else {
+			tab.vertSplits = append(tab.vertSplits, newView)
+		}
+		tab.views = append(tab.views, newView)
+
+		newView.splitParent = v.splitParent
+		newView.Num = len(tab.views) - 1
+		newView.isVertSplit = true
+	}
+
+	tabs[v.TabNum].Resize()
+	newView.matches = Match(newView)
+
 	return false
 }
 
@@ -297,7 +385,7 @@ func (v *View) HandleEvent(event tcell.Event) {
 	switch e := event.(type) {
 	case *tcell.EventResize:
 		// Window resized
-		v.Resize(e.Size())
+		// v.Resize(e.Size())
 	case *tcell.EventKey:
 		if e.Key() == tcell.KeyRune && (e.Modifiers() == 0 || e.Modifiers() == tcell.ModShift) {
 			// Insert a character
